@@ -24,13 +24,18 @@ static NSString * str = @"hahha";
  */
 @property (nonatomic,strong) NSArray* array;
 /**
- *  <#名字#>
+ *  操作
  */
 @property (nonatomic,strong) NSOperationQueue* queue;
-/**
- *  <#名字#>
- */
 
+/**
+ *  图片缓存
+ */
+@property (nonatomic , strong) NSMutableDictionary * pictureDit;
+/**
+ *  操作缓存
+ */
+@property (nonatomic,strong) NSMutableDictionary* operation;
 @end
 
 @implementation ViewController
@@ -43,6 +48,23 @@ static NSString * str = @"hahha";
     _queue = [[NSOperationQueue alloc] init];
 }
 
+
+- (NSMutableDictionary *)pictureDit{
+    
+    if (_pictureDit  == nil) {
+        _pictureDit = [NSMutableDictionary dictionary];
+    }
+    return _pictureDit;
+}
+
+- (NSMutableDictionary *)operation{
+    
+    if (_pictureDit ==nil) {
+        _operation = [NSMutableDictionary dictionary];
+        
+    }
+    return _operation;
+}
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -71,27 +93,74 @@ static NSString * str = @"hahha";
     loadModel * mode =    _array[indexPath.row];
     cell.namelable.text = mode.name;
     cell.loadLable.text = mode.download;
-    if (mode.image != nil ) {
-        
-        cell.picture.image = mode.image;
+    
+    UIImage * imageM = self.pictureDit[ mode.icon];
+    
+    if (imageM != nil) {
+        cell.picture.image = imageM;
+                NSLog(@"内存加载图片");
         return cell;
-        
     }
+    
+    
+    
+    UIImage * imageC = [UIImage imageWithContentsOfFile:[self getfile:mode.icon] ];
+    if (imageC!= nil) {
+        cell.picture.image = imageC;
+        [self.pictureDit setObject:imageC forKey:mode.icon];
+        
+                NSLog(@"磁盘加载");
+        return cell;
+    }
+    
+// 判断操作缓存内有没有有 这个cell 的缓存
+    if (self.operation[mode.icon] != nil) {
+        
+                NSLog(@"还在下载");
+        return cell;
+    }
+    
+    
+    
     cell.picture.image = [UIImage imageNamed:@"threeDog006"];
     
     NSURL * url = [NSURL URLWithString:mode.icon];
     
+    
+    //新建操作代码块
     NSBlockOperation * block = [NSBlockOperation blockOperationWithBlock:^{
         
         [NSThread sleepForTimeInterval:2];
+        
+        
         NSData * data = [NSData dataWithContentsOfURL:url];
+        
+        
         UIImage * imag = [UIImage imageWithData:data];
+                NSLog(@"下载图片");
+        if (imag != nil) {
+            
+            [self.pictureDit setObject:imag forKey:mode.icon];
+            [data writeToFile:[self getfile:mode.icon] atomically:YES];
+            
+            [self.operation removeObjectForKey:mode.icon];
+
+        }else{
+         
+                    NSLog(@"图片下载失败");
+            [self.operation removeObjectForKey:mode.icon];
+        }
+        
+        
+        
+        
         
         [[NSOperationQueue mainQueue] addOperationWithBlock:^{
             
             
                 cell.picture.image = imag;
-            mode.image = imag;
+//            [self.tablev reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:NO];
+            
         }];
         
         
@@ -99,12 +168,21 @@ static NSString * str = @"hahha";
     
     [_queue addOperation:block];
     
+    [self.operation setObject:block forKey:mode.icon];
+    
     
     
     
     return cell;
 }
-                                
+
+- (NSString *)getfile:(NSString *)str{
+    
+    NSString * strl = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES).lastObject;
+    NSString * strpath = [strl stringByAppendingPathComponent:str.lastPathComponent];
+    
+    return strpath;
+}
                                 
 - (void)loadData{
     
